@@ -215,11 +215,12 @@ function displayError(code) {
     console.log(`Displaying error ${code}`);
 }
 
-const progress_bar = new ProgressBar.Line('#progress-bar', {
-    color: '#1DB954',
+window.progress_bar = new ProgressBar.Line('#progress-bar', {
+    color: '#1DB954',   //not necessary since we have step, but i'm including it for reference
     duration: 300,
     easing: 'easeOut',
-    strokeWidth: 2
+    strokeWidth: 2,
+    step: (state, bar, attachment) => bar.path.setAttribute('stroke', state.color) //this is purely so we can change to red on error, otherwise step would be unencessary
 });
 
 function scaleNumber(n, given_min, given_max, target_min, target_max) {
@@ -234,8 +235,13 @@ function progressBarHandler({current_operation, total_operations, stage = 1, ...
     //let total_operations = total_tracks + Math.ceil(total_tracks / 20) + Math.ceil(total_tracks / 100);
                             //+ recursive_operations.missing_tracks + recursive_operations.get_album_calls;
     //^ see the algorithm used in estimateTimeTotal
+    if(stage == 'error') {
+        progress_bar.animate(progress_bar.value(), {from:{color:'#e31c0e'}, to:{color:'#e31c0e'}});    //red
+        $("#estimated-time-remaining p").text('Error');
+        return;
+    }
     if(stage == "done") {
-        progress_bar.animate(1);
+        progress_bar.animate(1, {from:{color:'#1DB954'}, to:{color:'#1DB954'}});
         $("#estimated-time-remaining p").text("Done!");
         return;
     }
@@ -262,7 +268,7 @@ function progressBarHandler({current_operation, total_operations, stage = 1, ...
 
     if(animate_value < progress_bar.value()) animate_value = progress_bar.value();  //prevent the progressbar from ever going backwards
     if(animate_value > 1) animate_value = 1;    //prevent the progressbar from performing weird visuals
-    progress_bar.animate(animate_value);
+    progress_bar.animate(animate_value, {from:{color:'#1DB954'}, to:{color:'#1DB954'}});
 
     $("#estimated-time-remaining p").text(stage_text[stage]());
 }
@@ -652,6 +658,7 @@ async function main() {
         console.log("finished adding songs to playlist!");
     } catch (e) {
         console.log("try-catch err", e);
+        progressBarHandler({stage: 'error'});  //change progressbar to red
         alert("The program enountered an error");
         //"delete" the playlist we just created
         //playlists are never deleted on spotify. see this article: https://github.com/spotify/web-api/issues/555
@@ -659,12 +666,12 @@ async function main() {
             if (ok) console.log("playlist succesfully deleted");
             else console.log(`unable to delete playlist, error: ${res}`);
         });
+        return;
     } finally {
-        progressBarHandler({stage: "done"});
         CURRENTLY_RUNNING = false;
         console.log("execution finished!");
     }
-
+    progressBarHandler({stage: "done"});    //this is outside of the finally block to ensure it doesn't get executed if we trigger a return statement
 }
 
 $(document).ready(function () {
