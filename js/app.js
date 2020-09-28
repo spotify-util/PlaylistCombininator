@@ -1,6 +1,6 @@
 import { credentials } from "./credentials.js";
 
-const CURRENT_VERSION = "0.1.3";
+const CURRENT_VERSION = "0.1.4";
 const REFRESH_RATE = { //used to control API rate limiting
     getUserPlaylists: 1,
     getPlaylistTracks: 250,
@@ -142,8 +142,10 @@ function okToRecursivelyFix(error_obj) {
     //determine if an error object is an api rate issue that can be fixed by calling it again,
     //or an error on our end (such as syntax) that can't be fixed by recalling the api
     console.log("checking if err is ok to recursively fix", error_obj);
-    if (error_obj.status >= 429) return true;
-    else {
+    if (error_obj.status >= 429) {
+        console.log("err IS ok to recursively fix", error_obj);
+        return true;
+    } else {
         console.log("err NOT ok to recursively fix", error_obj);
         return false
     };
@@ -373,7 +375,7 @@ function getUserPlaylists() {
                     if(checkPlaylist(playlist)) {
                         playlist_objects.push(playlist);
                     }
-                    progressBarHandler({current_operation:index + res.offset, total_operations:res.total, stage:1});
+                    progressBarHandler({current_operation:index + res.offset + 1, total_operations:res.total, stage:1});
                 });
                 
                 //if we have more playlists to get...
@@ -401,9 +403,9 @@ function getUserPlaylists() {
  * @param {string} playlist_id - The ID of the playlist to retrieve tracks from
  * @return {promise} - A promise that resolves with an array of tracks (only uris and explicitness) from the requested playlist
  */
-function getAllPlaylistTracks(playlist_id) {
+const getAllPlaylistTracks = function (playlist_id) {
     let options = {
-        fields:"next,items.track(uri,explicit,is_local,name)",
+        fields:"next,items.track(uri,id,explicit,is_local,name,artists,type)",
         market:"from_token",
         limit:100
     }, playlist_songs = [];
@@ -414,11 +416,12 @@ function getAllPlaylistTracks(playlist_id) {
                 //go thru all tracks in this api res and push them to array
                 for(const item of res.items) {
                     let track = item["track"];
-                    if(!track.is_local) playlist_songs.push(track);
+                    //found a rare, undocumented case of the track object sometimes returning null, specifically when calling the endpoint for this playlist: 6BbewZJ0Cv6V9XSXyyDBSm
+                    //there's also podcasts, so the track has to be of a specific type
+                    if(!!track && !track.is_local && track.type == 'track') playlist_songs.push(item);
                 }
                 //if there's more songs in the playlist, call ourselves again, otherwise resolve
                 if(!res.next) {
-                    console.log(`retrieved ${playlist_songs.length} songs`, playlist_songs);
                     resolve({playlist_songs:playlist_songs, playlist_id:playlist_id});  //resolve an object that will be handeled in our .then() catcher
                 } else await recursivelyRetrieveAllPlaylistTracks(res.next).then(res=>resolve(res)).catch(err=>reject(err));    //evidently this then/catch is necessary to get the promise to return something
             }).catch(err => {
@@ -435,33 +438,14 @@ function getAllPlaylistTracks(playlist_id) {
     return recursivelyRetrieveAllPlaylistTracks(`https://api.spotify.com/v1/playlists/${playlist_id}/tracks`, options);
 }
 
-function getTracksFromPlaylists(playlist_array = playlist_objects) {
-    return new Promise((resolve, reject) => {
-        let pending_getPlaylistTracksCalls = [];
-        let i = 0;
-        let stagger_api_calls = setInterval(() => {
-            if(i >= playlist_array.length) {
-                console.log("stopping api calls");
-                clearInterval(stagger_api_calls);
-                //resolve all the api calls then process the arrays of songs that were returned to us
-                return resolvePromiseArray(pending_getPlaylistTracksCalls, (err, res) => {
-                    console.log(err, res);
-                    if(err) reject(res);    //track_array acts as the err msg in this case
-                    for(const track_array of res) {     //push each track obj
-                        for(const track of track_array) global_playlist_tracks.push(track);
-                    }
-                   resolve(global_playlist_tracks); 
-                });
-            }
-            console.log(`making api call ${i} of ${playlist_array.length-1}`);
-            pending_getPlaylistTracksCalls.push(getAllPlaylistTracks(playlist_array[i].id).then(resObj => {
-                let extrapolated_index = playlist_array.findIndex(playlist => playlist.id == resObj.playlist_id);
-                progressBarHandler({ current_operation:extrapolated_index+1, total_operations:playlist_array.length, stage:2, playlist_name:playlist_array[extrapolated_index].name});
-                return resObj.playlist_songs;
-            }));
-            i++;
-        }, REFRESH_RATE.getPlaylistTracks);
-    });
+const getPlaylistTracks = async function (playlist_id = '') {
+    //returns an array of all the tracks from a single, given playlist
+    try {
+        return await getAllPlaylistTracks(playlist_id).then((res_obj) => res_obj.playlist_songs);
+    } catch (err) {
+        console.log(`Error in getPlaylistTracks try-catch block:`, err);
+        throw err;
+    }
 }
 
 /**
@@ -574,7 +558,7 @@ function addTracksToPlaylistHandler(playlist, uri_array) {
                     //resolve all the api calls, then do something with all the resolved calls
                     //"return" b/c the code will otherwise continue to make anotehr api call
                     return resolvePromiseArray(pending_addTracksToPlaylist_calls, (err, finished_api_calls) => {
-                        console.log(finished_api_calls);
+                        console.log(err, finished_api_calls);
                         if (err) { // do something if i migrate this to its own function
                             console.log("error in API batch add function", finished_api_calls);
                             reject(finished_api_calls);
@@ -632,11 +616,15 @@ async function main() {
             else console.log("Firebase data written successfully");
         });
         console.log("retrieving user playlists...");
-        await getUserPlaylists();
+        await getUserPlaylists();   //puts a simplified playlist obj for each playlist the into playlist_objects array
         console.log("finished retrieving user playlists!", playlist_objects);
         //now we need to retrieve a random track from each album
         console.log("retrieving songs from each playlist...");
-        await getTracksFromPlaylists(playlist_objects);
+        for(let idx=0, playlist_obj=playlist_objects[idx]; idx < playlist_objects.length; playlist_obj=playlist_objects[++idx]) {
+            progressBarHandler({current_operation:idx+1, total_operations:playlist_objects.length, stage:2, playlist_name:playlist_obj.name});
+            let track_res = await getPlaylistTracks(playlist_obj.id);
+            for(const item of track_res) global_playlist_tracks.push(item.track);
+        };
         console.log("finished retrieving songs from each playlist!", global_playlist_tracks);
 
         console.log("filtering songs based off user's options...");
