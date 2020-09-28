@@ -352,7 +352,7 @@ function resolvePromiseArray(promise_array, callback) {
  * @param {object} playlist_obj - A simplified playlist object to check
  * @return {boolean} Whether the playlist passes the check or not
  */
-function checkPlaylist(playlist_obj = {}) {
+const checkPlaylist = function (playlist_obj = {}) {
     if(playlist_obj.collaborative == undefined || playlist_obj.owner == undefined || playlist_obj.public == undefined) return false;
     if(playlist_obj.tracks.total < 1) return false; //no need to get the tracks of a playlist if there aren't any there
 
@@ -363,9 +363,13 @@ function checkPlaylist(playlist_obj = {}) {
         return false;
     };
     if(!USER_OPTIONS.include_christmas && isChristmas(playlist_obj)) return false;
-    //if user says no privates and playlist is not public (private)
-    if(!USER_OPTIONS.include_private && !playlist_obj.public) return false;
-    if(!USER_OPTIONS.include_collaborative && playlist_obj.collaborative) return false;
+    //if playlist is public, return true (universal implication)
+    if(playlist_obj.public) return true;
+    //if user says no privates and this is their playlist and playlist is not public (private)
+    if(!USER_OPTIONS.include_private && playlist_obj.owner.id == user_credentials.uid && !playlist_obj.public) return false;
+    //if user says no collab and this is their playlist and playlist is collaborative
+    if(!USER_OPTIONS.include_collaborative && playlist_obj.owner.id == user_credentials.uid && playlist_obj.collaborative) return false;
+    //if user says no followed, and they are not the owner of the playlist
     if(!USER_OPTIONS.include_followed && playlist_obj.owner.id != user_credentials.uid) return false;
     return true;    //passed all tests
 }
