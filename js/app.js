@@ -53,7 +53,7 @@ var database;
 var global_playlist_tracks = [];
 
 
-function callSpotify(url, data) {
+const callSpotify = function (url, data) {
     if(!user_credentials) return new Promise((resolve, reject) => reject("no user_credentials"));
     return $.ajax(url, {
         dataType: 'json',
@@ -62,9 +62,9 @@ function callSpotify(url, data) {
             'Authorization': 'Bearer ' + user_credentials.token
         }
     });
-}
+};
 
-function postSpotify(url, json, callback) {
+const postSpotify = function (url, json, callback) {
     $.ajax(url, {
         type: "POST",
         data: JSON.stringify(json),
@@ -87,9 +87,9 @@ function postSpotify(url, json, callback) {
             }
         }
     });
-}
+};
 
-function deleteSpotify(url, callback) {
+const deleteSpotify = function (url, callback) {
     $.ajax(url, {
         type: "DELETE",
         //data: JSON.stringify(json),
@@ -112,7 +112,7 @@ function deleteSpotify(url, callback) {
             }
         }
     });
-}
+};
 
 /**
  * Shuffles an array and does not modify the original.
@@ -120,13 +120,13 @@ function deleteSpotify(url, callback) {
  * @param {array} array - An array to shuffle.
  * @return {array} A shuffled array.
  */
-function shuffleArray(array) {
+const shuffleArray = function (array) {
     //modified from https://javascript.info/task/shuffle
 
     let tmpArray = [...array];
 
     for (let i = tmpArray.length - 1; i > 0; i--) {
-        let j = Math.floor(Math.random() * (i + 1)); // random RESPONSE_INDEX from 0 to i
+        const j = Math.floor(Math.random() * (i + 1)); // random RESPONSE_INDEX from 0 to i
 
         // swap elements tmpArray[i] and tmpArray[j]
         // we use "destructuring assignment" syntax to achieve that
@@ -136,9 +136,9 @@ function shuffleArray(array) {
         [tmpArray[i], tmpArray[j]] = [tmpArray[j], tmpArray[i]];
     }
     return tmpArray;
-}
+};
 
-function okToRecursivelyFix(error_obj) {
+const okToRecursivelyFix = function (error_obj) {
     //determine if an error object is an api rate issue that can be fixed by calling it again,
     //or an error on our end (such as syntax) that can't be fixed by recalling the api
     console.log("checking if err is ok to recursively fix", error_obj);
@@ -149,9 +149,9 @@ function okToRecursivelyFix(error_obj) {
         console.log("err NOT ok to recursively fix", error_obj);
         return false
     };
-}
+};
 
-function loginWithSpotify() {
+const loginWithSpotify = function () {
     if (document.location.hostname == 'localhost') {
         credentials.spotify.redirect_uri = 'http://localhost:8888/index.html';
     }
@@ -164,56 +164,20 @@ function loginWithSpotify() {
     //redirect the page to spotify's login page. after login user comes back to our page with a token in
     //page hash, or, if they're already logged in, a token in customLocalStorage's user_credentials
     document.location = url;
-}
+};
 
-function getTime() {
+const getTime = function () {
     return Math.round(new Date().getTime() / 1000);
-}
-
-function estimateTimeTotal(track_count) {
-    //estimates the amount of time it will take to generate a random playlist with the given amount of songs
-    //returns the estimated time in milliseconds
-    if (isNaN(track_count) || track_count == 0) return 0;
-    let total = 1000; //1sec cushion
-    total += track_count * REFRESH_RATE.populateAlbumArray;
-    total += Math.ceil(track_count / 20) * REFRESH_RATE.populateSongArray;
-    total += Math.ceil(track_count / 100) * REFRESH_RATE.addTracksToPlaylist;
-    return total;
-}
-
-function estimateTimeRemaining({remaining_tracks, total_tracks = global_track_count} = {}) {
-    //estimates the amount of time left until the remaining number of tracks have been added
-    //returns the estimated time in milliseconds
-    if(isNaN(remaining_tracks) || isNaN(total_tracks)) return 0;
-    if (remaining_tracks < 0) remaining_tracks = 0;
-    let total = 0;
-    total += remaining_tracks * REFRESH_RATE.populateAlbumArray;
-    total += Math.ceil(remaining_tracks / 20) * REFRESH_RATE.populateSongArray;
-    total += Math.ceil(total_tracks / 100) * REFRESH_RATE.addTracksToPlaylist;
-    return total;
-}
-
-function readableMs(ms) {
-    //returns a readable, english version of a time given in ms
-    let str = "",
-        [hours, mins, secs] = [0, 0, 0];
-    hours = Math.floor(ms / 1000 / 60 / 60);
-    ms -= (hours * 1000 * 60 * 60);
-    mins = Math.floor(ms / 1000 / 60);
-    ms -= (mins * 1000 * 60);
-    secs = Math.floor(ms / 1000); //floor instead of round to prevent displaying 60sec
-    str = `${hours > 0 ? `${hours}${hours==1 ? "hr":"hrs"} `:""}${mins > 0 ? `${mins}${mins==1 ? "min":"mins"} `:""}${secs}${secs==1 ? "sec":"secs"}`;
-    return str;
-}
+};
 
 const ERROR_OBJ = {
     //100: invalid input
     
-}
+};
 
-function displayError(code) {
+const displayError = function (code) {
     console.log(`Displaying error ${code}`);
-}
+};
 
 window.progress_bar = new ProgressBar.Line('#progress-bar', {
     color: '#1DB954',   //not necessary since we have step, but i'm including it for reference
@@ -223,13 +187,23 @@ window.progress_bar = new ProgressBar.Line('#progress-bar', {
     step: (state, bar, attachment) => bar.path.setAttribute('stroke', state.color) //this is purely so we can change to red on error, otherwise step would be unencessary
 });
 
-function scaleNumber(n, given_min, given_max, target_min, target_max) {
-    let given_range = given_max - given_min,
-    target_range = target_max - target_min;
+/**
+ * Scales number n in the given domain to the target domain
+ * 
+ * @param {number} n            - The number to scale
+ * @param {number} given_min    - The lower limit of n's domain
+ * @param {number} given_max    - The upper limit of n's domain
+ * @param {number} target_min   - The lower limit of the domain for n to be scaled into
+ * @param {number} target_max   - The upper limit of the domain for n to be scaled into
+ * @return {number} The corresponding value for n in the target domain 
+ */
+const scaleNumber = function (n, given_min, given_max, target_min, target_max) {
+    const given_range = given_max - given_min;
+    const target_range = target_max - target_min;
     return ((n - given_min) * target_range / given_range) + target_min;
-}
+};
 
-function progressBarHandler({current_operation, total_operations, stage = 1, ...junk} = {}) {
+const progressBarHandler = function ({current_operation, total_operations, stage = 1, ...junk} = {}) {
     //the idea is that each api call we make results in the progress bar updating
     //we need to get the total number of calls that will be made
     //let total_operations = total_tracks + Math.ceil(total_tracks / 20) + Math.ceil(total_tracks / 100);
@@ -246,8 +220,7 @@ function progressBarHandler({current_operation, total_operations, stage = 1, ...
         return;
     }
 
-    let animate_value = 0,
-    estTimeText = "Unknown";
+    let animate_value = 0;
 
     let stage_text = {
         1:() => "Getting your playlists...",
@@ -271,9 +244,9 @@ function progressBarHandler({current_operation, total_operations, stage = 1, ...
     progress_bar.animate(animate_value, {from:{color:'#1DB954'}, to:{color:'#1DB954'}});
 
     $("#estimated-time-remaining p").text(stage_text[stage]());
-}
+};
 
-async function performAuthDance() {
+const performAuthDance = async function () {
     // if we already have a token and it hasn't expired, use it,
     if ('user_credentials' in customLocalStorage.getContent()) {
         user_credentials = customLocalStorage.getContent().user_credentials;
@@ -336,15 +309,15 @@ async function performAuthDance() {
             console.log("user needs to login!");
         }
     }
-}
+};
 
-function resolvePromiseArray(promise_array, callback) {
+const resolvePromiseArray = function (promise_array, callback) {
     Promise.all(promise_array).then((results) => callback(false, results)).catch((err) => {
         console.log(`error found in resolvePromiseArray: `, err);
         callback(true, err);
         //removing ^ that should stop the TypeError: finished_api_calls.forEach is not a function
     });
-}
+};
 
 /**
  * Checks a playlist against the global user options
@@ -372,13 +345,13 @@ const checkPlaylist = function (playlist_obj = {}) {
     //if user says no followed, and they are not the owner of the playlist
     if(!USER_OPTIONS.include_followed && playlist_obj.owner.id != user_credentials.uid) return false;
     return true;    //passed all tests
-}
+};
 
-function getUserPlaylists() {
+const getUserPlaylists = function () {
     //retrieves the playlists of the currently logged in user and checks them against
     //global options. stores the hrefs of playlist track list in a global array
 
-    function recursivelyGetAllPlaylists(url) {
+    const recursivelyGetAllPlaylists = function (url) {
         return new Promise((resolve, reject) => {
             callSpotify(url).then(async res => {
                 res.items.forEach((playlist, index) => {
@@ -405,7 +378,7 @@ function getUserPlaylists() {
 
     //the recursive function returns a promise
     return recursivelyGetAllPlaylists("https://api.spotify.com/v1/me/playlists?limit=50");
-}
+};
 
 /**
  * Retrieves all tracks from a playlist and adds them to a global array. Ignores local files
@@ -420,7 +393,7 @@ const getAllPlaylistTracks = function (playlist_id) {
         limit:100
     }, playlist_songs = [];
     
-    function recursivelyRetrieveAllPlaylistTracks(url, options = {}) {
+    const recursivelyRetrieveAllPlaylistTracks = function (url, options = {}) {
         return new Promise((resolve, reject) => {
             callSpotify(url, options).then(async res => {
                 //go thru all tracks in this api res and push them to array
@@ -446,7 +419,7 @@ const getAllPlaylistTracks = function (playlist_id) {
     }
 
     return recursivelyRetrieveAllPlaylistTracks(`https://api.spotify.com/v1/playlists/${playlist_id}/tracks`, options);
-}
+};
 
 const getPlaylistTracks = async function (playlist_id = '') {
     //returns an array of all the tracks from a single, given playlist
@@ -456,7 +429,7 @@ const getPlaylistTracks = async function (playlist_id = '') {
         console.log(`Error in getPlaylistTracks try-catch block:`, err);
         throw err;
     }
-}
+};
 
 /**
  * Filters an array of tracks against a set of global options
@@ -464,7 +437,7 @@ const getPlaylistTracks = async function (playlist_id = '') {
  * @param {array} track_array - The array of tracks to filter
  * @return {array} - A filtered array of tracks
  */
-function filterTracks(track_array = global_playlist_tracks) {
+const filterTracks = function (track_array = global_playlist_tracks) {
     //idea is to minimize the amount of work we perform
     //remove duplicates first that way we aren't filtering thru songs that would've just ended up being removed later on
     progressBarHandler({current_operation:1, total_operations:2, stage:3});
@@ -476,9 +449,9 @@ function filterTracks(track_array = global_playlist_tracks) {
     if(!USER_OPTIONS.allow_explicits) filtered_array = filtered_array.filter(track=>!track.explicit);
     progressBarHandler({current_operation:2, total_operations:2, stage:3});
     return filtered_array;
-}
+};
 
-function createPlaylist(params = { name: "New Playlist" }) {
+const createPlaylist = function (params = { name: "New Playlist" }) {
     //create a playlist with the given params, and return the created playlist
     return new Promise((resolve, reject) => {
         var url = "https://api.spotify.com/v1/users/" + user_credentials.uid + "/playlists";
@@ -493,9 +466,9 @@ function createPlaylist(params = { name: "New Playlist" }) {
             }
         });
     });
-}
+};
 
-function prepTracksForPlaylistAddition(track_array = global_playlist_tracks) {
+const prepTracksForPlaylistAddition = function (track_array = global_playlist_tracks) {
     //prepares an array of songs for addition to a spotify playlist
     //by sorting them into arrays of 100 songs each, then returning
     //an array that contains all of those 100-song arrays
@@ -514,9 +487,9 @@ function prepTracksForPlaylistAddition(track_array = global_playlist_tracks) {
     }
     if(tmparry.length > 10000) tmparry.length = 10000;    //truncate
     return tmparry;
-}
+};
 
-function addTracksToPlaylist(playlist_obj, uri_array) {
+const addTracksToPlaylist = function (playlist_obj, uri_array) {
     //uri_array needs to be less than 101, please make sure you've checked that before
     //you call this function, otherwise it will err
 
@@ -552,9 +525,9 @@ function addTracksToPlaylist(playlist_obj, uri_array) {
 
         //resolve("error: bypassed await...");
     });
-}
+};
 
-function addTracksToPlaylistHandler(playlist, uri_array) {
+const addTracksToPlaylistHandler = function (playlist, uri_array) {
     let pending_addTracksToPlaylist_calls = []; //create a promise array
     console.log("starting API batch addTracksToPlaylist calls");
     return new Promise((resolve, reject) => {
@@ -592,23 +565,9 @@ function addTracksToPlaylistHandler(playlist, uri_array) {
                 uri_batch_index++;
             }, REFRESH_RATE.addTracksToPlaylist);
     });
-}
+};
 
-async function recursivelyFillArray(song_array = randomSongArray, track_count = global_track_count) {
-    //no need to return and resolve promise since this is async, just return any value
-    let tmpAlbumArray = [];
-    try {
-        //fill our tmpAlbumArray with however many songs it needs to fill song_array
-        await populateAlbumArray(track_count - song_array.length, tmpAlbumArray, true);
-        await populateSongArray(tmpAlbumArray);  //this pushes to the global randomSongArray which is being watched by our main()
-    } catch(e) {
-        throw e;    //this will go back to our main() function
-    } finally {
-        return; //resolve the promise
-    }
-}
-
-async function main() {
+const main = async function () {
     //reset global stuff
     playlist_objects = [], global_playlist_tracks = [];
     CURRENTLY_RUNNING = true;
@@ -676,7 +635,7 @@ async function main() {
         console.log("execution finished!");
     }
     progressBarHandler({stage: "done"});    //this is outside of the finally block to ensure it doesn't get executed if we trigger a return statement
-}
+};
 
 $(document).ready(function () {
     console.log(`Running PlaylistCombininator version ${CURRENT_VERSION}\nDeveloped by Elijah O`);
