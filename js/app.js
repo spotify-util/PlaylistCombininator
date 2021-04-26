@@ -30,7 +30,7 @@ const USER_OPTIONS = {
 //some global variables
 var customLocalStorage = {
     getContent: function() {
-        if(!localStorage.hasOwnProperty('spotify_util') || !JSON.parse(localStorage.getItem('spotify_util')).hasOwnProperty("spotifyparallel")) localStorage.setItem('spotify_util', JSON.stringify({ ...JSON.parse(localStorage.getItem('spotify_util')), playlistcombininator:{} }));
+        if(!localStorage.hasOwnProperty('spotify_util') || !JSON.parse(localStorage.getItem('spotify_util')).hasOwnProperty("playlistcombininator")) localStorage.setItem('spotify_util', JSON.stringify({ ...JSON.parse(localStorage.getItem('spotify_util')), playlistcombininator:{} }));
         return JSON.parse(localStorage.getItem("spotify_util"))["playlistcombininator"] || {};
     },
     set: function(key, val) {
